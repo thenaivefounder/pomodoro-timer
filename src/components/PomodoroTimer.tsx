@@ -315,24 +315,63 @@ export default function PomodoroTimer() {
     playAudio('work');
   };
 
-  // Progress calculation
+  // Calculate progress percentage
   const progress = ((getCurrentDuration() - timeLeft) / getCurrentDuration()) * 100;
+
+  // Get theme colors based on current mode
+  const getProgressColor = () => {
+    switch (currentMode) {
+      case 'work':
+        return 'stroke-red-500'; // Tomato red for work
+      case 'shortBreak':
+        return 'stroke-green-500'; // Green for short break
+      case 'longBreak':
+        return 'stroke-blue-500'; // Blue for long break
+      default:
+        return 'stroke-red-500';
+    }
+  };
+
+  const getModeIcon = () => {
+    switch (currentMode) {
+      case 'work':
+        return '🍅'; // Tomato for work
+      case 'shortBreak':
+        return '☕'; // Coffee for short break
+      case 'longBreak':
+        return '🌴'; // Palm tree for long break
+      default:
+        return '🍅';
+    }
+  };
+
+  const getBadgeVariant = () => {
+    switch (currentMode) {
+      case 'work':
+        return 'default'; // Will use our new tomato primary
+      case 'shortBreak':
+      case 'longBreak':
+        return 'secondary';
+      default:
+        return 'default';
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Main Timer Card */}
-      <Card className="relative overflow-hidden">
+      <Card className="relative overflow-hidden border-red-200 dark:border-red-800/30">
         <CardHeader className="text-center">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Badge variant={currentMode === 'work' ? 'default' : 'secondary'}>
-                {currentMode === 'work' ? 'Work Session' : 
-                 currentMode === 'shortBreak' ? 'Short Break' : 'Long Break'}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Session {completedSessions + 1}
-              </span>
-            </div>
+                          <div className="flex items-center space-x-2">
+                <Badge variant={getBadgeVariant()}>
+                  {getModeIcon()} {currentMode === 'work' ? 'Work Session' : 
+                   currentMode === 'shortBreak' ? 'Short Break' : 'Long Break'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Session {completedSessions + 1}
+                </span>
+              </div>
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -498,12 +537,13 @@ export default function PomodoroTimer() {
                 fill="none"
                 strokeDasharray={`${2 * Math.PI * 45}`}
                 strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                className="text-primary transition-all duration-1000 ease-in-out"
+                className={`${getProgressColor()} transition-all duration-1000 ease-in-out`}
                 strokeLinecap="round"
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
+                <div className="text-5xl mb-2">{getModeIcon()}</div>
                 <div className="text-4xl font-bold">{formatTime(timeLeft)}</div>
                 <div className="text-sm text-muted-foreground">
                   {Math.round(progress)}% complete
@@ -570,7 +610,7 @@ export default function PomodoroTimer() {
         <CardContent>
           {sessions.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No sessions completed yet. Start your first Pomodoro!
+              🍅 No sessions completed yet. Start your first Pomodoro!
             </p>
           ) : (
             <div className="space-y-3">
@@ -579,7 +619,7 @@ export default function PomodoroTimer() {
                   <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div className="flex items-center space-x-3">
                       <Badge variant={session.type === 'work' ? 'default' : 'secondary'}>
-                        {session.type === 'work' ? 'Work' : 'Break'}
+                        {session.type === 'work' ? '🍅 Work' : '☕ Break'}
                       </Badge>
                       <span className="font-medium">
                         {Math.round(session.duration / 60)} minutes
