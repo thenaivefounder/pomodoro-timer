@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -215,7 +215,7 @@ export default function PomodoroTimer() {
   };
 
   // Complete current session and move to next
-  const completeSession = () => {
+  const completeSession = useCallback(() => {
     if (!currentSessionStart) return;
 
     const endTime = new Date();
@@ -258,11 +258,11 @@ export default function PomodoroTimer() {
 
     setIsActive(false);
     setCurrentSessionStart(null);
-  };
+  }, [currentSessionStart, currentMode, completedSessions, settings, playAudio, showNotification]);
 
   // Timer effect
   useEffect(() => {
-    if (isActive && timeLeft > 0) {
+    if (isActive) {
       intervalRef.current = setInterval(() => {
         setTimeLeft(prevTime => {
           if (prevTime <= 1) {
@@ -283,7 +283,7 @@ export default function PomodoroTimer() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isActive, timeLeft]);
+  }, [isActive, completeSession]);
 
   // Update timer when mode changes
   useEffect(() => {
