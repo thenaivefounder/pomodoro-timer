@@ -57,6 +57,7 @@ export default function PomodoroTimer() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const completionRef = useRef<() => void>(() => {});
 
   // Request notification permission
   const requestNotificationPermission = async () => {
@@ -76,10 +77,16 @@ export default function PomodoroTimer() {
   }, []);
 
   // Play audio alert
-  const playAudio = (type: 'work' | 'break') => {
+  const playAudio = useCallback((type: 'work' | 'break') => {
     if (!settings.audioEnabled) return;
 
     try {
+      // Check if AudioContext is supported
+      if (typeof window === 'undefined' || !window.AudioContext && !(window as any).webkitAudioContext) {
+        console.warn('AudioContext not supported');
+        return;
+      }
+
       // Create audio context for different tones
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
@@ -110,11 +117,12 @@ export default function PomodoroTimer() {
     } catch (error) {
       console.warn('Audio not supported or failed:', error);
     }
-  };
+  }, [settings.audioEnabled]);
 
   // Show browser notification
-  const showNotification = (completedType: 'work' | 'break', nextType: 'work' | 'shortBreak' | 'longBreak') => {
+  const showNotification = useCallback((completedType: 'work' | 'break', nextType: 'work' | 'shortBreak' | 'longBreak') => {
     if (!settings.notificationsEnabled || notificationPermission !== 'granted') return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
 
     const completedText = completedType === 'work' ? 'Work Session' : 'Break';
     const nextText = nextType === 'work' ? 'Work Session' : 
@@ -153,7 +161,7 @@ export default function PomodoroTimer() {
     } catch (error) {
       console.warn('Notification failed:', error);
     }
-  };
+  }, [settings.notificationsEnabled, notificationPermission]);
 
   // Calculate current session duration
   const getCurrentDuration = () => {
@@ -228,7 +236,17 @@ export default function PomodoroTimer() {
       completed: true,
     };
 
-    setSessions(prev => [newSession, ...prev]);
+    // Check if a session with the same start time already exists to prevent duplicates
+    setSessions(prev => {
+      const existingSession = prev.find(session => 
+        session.startTime.getTime() === currentSessionStart.getTime()
+      );
+      if (existingSession) {
+        console.warn('Duplicate session detected, skipping');
+        return prev;
+      }
+      return [newSession, ...prev];
+    });
 
     const completedType = currentMode === 'work' ? 'work' : 'break';
     let nextMode: 'work' | 'shortBreak' | 'longBreak';
@@ -260,13 +278,24 @@ export default function PomodoroTimer() {
     setCurrentSessionStart(null);
   }, [currentSessionStart, currentMode, completedSessions, settings, playAudio, showNotification]);
 
+  // Update the completion ref whenever completeSession changes
+  useEffect(() => {
+    completionRef.current = completeSession;
+  }, [completeSession]);
+
   // Timer effect
   useEffect(() => {
     if (isActive) {
       intervalRef.current = setInterval(() => {
         setTimeLeft(prevTime => {
           if (prevTime <= 1) {
-            completeSession();
+            // Use a timeout to ensure completeSession is called only once
+            // and after the current render cycle, using ref to avoid stale closures
+            setTimeout(() => {
+              if (completionRef.current) {
+                completionRef.current();
+              }
+            }, 0);
             return 0;
           }
           return prevTime - 1;
@@ -283,7 +312,7 @@ export default function PomodoroTimer() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isActive, completeSession]);
+  }, [isActive]); // Removed completeSession from dependencies
 
   // Update timer when mode changes
   useEffect(() => {
