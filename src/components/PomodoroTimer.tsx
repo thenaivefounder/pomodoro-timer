@@ -58,6 +58,7 @@ export default function PomodoroTimer() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completionRef = useRef<() => void>(() => {});
+  const isCompletingRef = useRef(false);
 
   // Request notification permission
   const requestNotificationPermission = async () => {
@@ -224,7 +225,10 @@ export default function PomodoroTimer() {
 
   // Complete current session and move to next
   const completeSession = useCallback(() => {
-    if (!currentSessionStart) return;
+    if (!currentSessionStart || isCompletingRef.current) return;
+    
+    // Set flag to prevent multiple calls
+    isCompletingRef.current = true;
 
     const endTime = new Date();
     const newSession: PomodoroSession = {
@@ -252,8 +256,16 @@ export default function PomodoroTimer() {
     let nextMode: 'work' | 'shortBreak' | 'longBreak';
 
     if (currentMode === 'work') {
-      setCompletedSessions(prev => prev + 1);
-      // Determine next break type
+      // Only increment if we haven't already processed this session
+      setCompletedSessions(prev => {
+        // Check if we've already counted this session by comparing with existing sessions
+        const shouldIncrement = !sessions.some(session => 
+          session.startTime.getTime() === currentSessionStart.getTime()
+        );
+        return shouldIncrement ? prev + 1 : prev;
+      });
+      
+      // Use the current completed sessions count for calculation
       const nextCount = completedSessions + 1;
       if (nextCount % settings.sessionsUntilLongBreak === 0) {
         nextMode = 'longBreak';
@@ -276,7 +288,12 @@ export default function PomodoroTimer() {
 
     setIsActive(false);
     setCurrentSessionStart(null);
-  }, [currentSessionStart, currentMode, completedSessions, settings, playAudio, showNotification]);
+    
+    // Reset the completion flag
+    setTimeout(() => {
+      isCompletingRef.current = false;
+    }, 100);
+  }, [currentSessionStart, currentMode, completedSessions, sessions, settings, playAudio, showNotification]);
 
   // Update the completion ref whenever completeSession changes
   useEffect(() => {
@@ -289,10 +306,9 @@ export default function PomodoroTimer() {
       intervalRef.current = setInterval(() => {
         setTimeLeft(prevTime => {
           if (prevTime <= 1) {
-            // Use a timeout to ensure completeSession is called only once
-            // and after the current render cycle, using ref to avoid stale closures
+            // Use timeout and ref to prevent multiple calls
             setTimeout(() => {
-              if (completionRef.current) {
+              if (completionRef.current && !isCompletingRef.current) {
                 completionRef.current();
               }
             }, 0);
@@ -312,7 +328,7 @@ export default function PomodoroTimer() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isActive]); // Removed completeSession from dependencies
+  }, [isActive]); // Removed timeLeft and completeSession from dependencies
 
   // Update timer when mode changes
   useEffect(() => {
